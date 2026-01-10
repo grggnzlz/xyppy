@@ -1,12 +1,43 @@
 from xyppy.ops_impl import *
 
-dispatch = [None]*256
-has_store_var = [False]*256
-has_branch_var = [False]*256
+class OpcodeTables:
+    __slots__ = (
+        "dispatch",
+        "has_store_var",
+        "has_branch_var",
+        "ext_dispatch",
+        "ext_has_store_var",
+        "ext_has_branch_var",
+    )
 
-ext_dispatch = [None]*256
-ext_has_store_var = [False]*256
-ext_has_branch_var = [False]*256
+    def __init__(self):
+        self.dispatch = [None] * 256
+        self.has_store_var = [False] * 256
+        self.has_branch_var = [False] * 256
+        self.ext_dispatch = [None] * 256
+        self.ext_has_store_var = [False] * 256
+        self.ext_has_branch_var = [False] * 256
+
+    def reset(self):
+        self.dispatch[:] = [None] * 256
+        self.has_store_var[:] = [False] * 256
+        self.has_branch_var[:] = [False] * 256
+        self.ext_dispatch[:] = [None] * 256
+        self.ext_has_store_var[:] = [False] * 256
+        self.ext_has_branch_var[:] = [False] * 256
+
+_module_tables = OpcodeTables()
+
+dispatch = _module_tables.dispatch
+has_store_var = _module_tables.has_store_var
+has_branch_var = _module_tables.has_branch_var
+
+ext_dispatch = _module_tables.ext_dispatch
+ext_has_store_var = _module_tables.ext_has_store_var
+ext_has_branch_var = _module_tables.ext_has_branch_var
+
+def get_tables(env):
+    return getattr(env, "op_tables", _module_tables)
 
 def op(opcode, f, svar=False, bvar=False):
     dispatch[opcode] = f
@@ -18,7 +49,7 @@ def ext(opcode, f, svar=False, bvar=False):
     ext_has_store_var[opcode] = svar
     ext_has_branch_var[opcode] = bvar
 
-def setup_opcodes(env):
+def _define_opcodes(env, op, ext):
 
     op(1,   je,                         bvar=True)
     op(2,   jl,                         bvar=True)
@@ -304,3 +335,22 @@ def setup_opcodes(env):
     ext(12, check_unicode, svar=True)
     # ext(13, set_true_colour)
 
+def setup_opcodes(env):
+    _module_tables.reset()
+    _define_opcodes(env, op, ext)
+
+def build_tables(env):
+    tables = OpcodeTables()
+
+    def op_local(opcode, f, svar=False, bvar=False):
+        tables.dispatch[opcode] = f
+        tables.has_store_var[opcode] = svar
+        tables.has_branch_var[opcode] = bvar
+
+    def ext_local(opcode, f, svar=False, bvar=False):
+        tables.ext_dispatch[opcode] = f
+        tables.ext_has_store_var[opcode] = svar
+        tables.ext_has_branch_var[opcode] = bvar
+
+    _define_opcodes(env, op_local, ext_local)
+    return tables

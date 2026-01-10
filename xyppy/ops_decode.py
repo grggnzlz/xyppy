@@ -136,14 +136,15 @@ def decode(env, pc):
         else:
             err('unknown operand size specified: ' + str(size))
 
+    tables = ops.get_tables(env)
     if form == ExtForm:
-        dispatch = ops.ext_dispatch
-        has_store_var = ops.ext_has_store_var
-        has_branch_var = ops.ext_has_branch_var
+        dispatch = tables.ext_dispatch
+        has_store_var = tables.ext_has_store_var
+        has_branch_var = tables.ext_has_branch_var
     else:
-        dispatch = ops.dispatch
-        has_store_var = ops.has_store_var
-        has_branch_var = ops.has_branch_var
+        dispatch = tables.dispatch
+        has_store_var = tables.has_store_var
+        has_branch_var = tables.has_branch_var
 
     opinfo = OpInfo(operands, var_op_info)
 
@@ -209,4 +210,3 @@ def decode(env, pc):
         err('unknown z-machine opcode: {}{}'.format(opcode, ext_info))
 
     return opfn, opinfo, next_pc
-
