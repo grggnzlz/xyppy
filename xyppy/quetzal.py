@@ -206,45 +206,21 @@ class StksChunk(Chunk):
         self.size = len(framebytes)
         return packHdr(self) + framebytes
 
-def read(filename):
-    if os.path.exists(filename + '.sav'):
-        filename += '.sav'
-    with open(filename, 'rb') as f:
-        formChunk = FormChunk.from_chunk(Chunk.from_data(f.read()))
-        for chunk in formChunk.chunks:
-            if chunk.name == b'IFhd':
-                hdChunk = IFhdChunk.from_chunk(chunk)
-            if chunk.name == b'CMem':
-                memChunk = CMemChunk.from_chunk(chunk)
-            if chunk.name == b'UMem':
-                memChunk = UMemChunk.from_chunk(chunk)
-            if chunk.name == b'Stks':
-                stksChunk = StksChunk.from_chunk(chunk)
+def _parse_save_data(data):
+    formChunk = FormChunk.from_chunk(Chunk.from_data(data))
+    for chunk in formChunk.chunks:
+        if chunk.name == b'IFhd':
+            hdChunk = IFhdChunk.from_chunk(chunk)
+        if chunk.name == b'CMem':
+            memChunk = CMemChunk.from_chunk(chunk)
+        if chunk.name == b'UMem':
+            memChunk = UMemChunk.from_chunk(chunk)
+        if chunk.name == b'Stks':
+            stksChunk = StksChunk.from_chunk(chunk)
     return formChunk.subname, hdChunk, memChunk, stksChunk.frames
 
-def write(env, filename):
-    if not filename.endswith('.sav'):
-        filename += '.sav'
-    try:
-        with open(filename, 'wb') as f:
-            chunks = [IFhdChunk.from_env(env),
-                      CMemChunk.from_env(env),
-                      StksChunk.from_env(env)]
-            formChunk = FormChunk.from_chunk_list(b'IFZS', chunks)
-            f.write(formChunk.pack())
-        return True
-    except IOError as ioerr:
-        env.screen.msg('error writing save file: '+str(ioerr)+'\n')
-        return False
-
-def load_to_env(env, filename):
+def _apply_save_data(env, subname, hdrChunk, memChunk, frames):
     msg = env.screen.msg
-    try:
-        subname, hdrChunk, memChunk, frames = read(filename)
-    except IOError as ioerr:
-        env.screen.msg('error reading file: '+str(ioerr)+'\n')
-        return False
-
     if subname != b'IFZS':
         msg('not a quetzal save file\n')
     if env.hdr.release != hdrChunk.release:
@@ -270,3 +246,39 @@ def load_to_env(env, filename):
         return True
     return False
 
+def dump_bytes(env):
+    chunks = [IFhdChunk.from_env(env),
+              CMemChunk.from_env(env),
+              StksChunk.from_env(env)]
+    formChunk = FormChunk.from_chunk_list(b'IFZS', chunks)
+    return formChunk.pack()
+
+def load_bytes_to_env(env, data):
+    return _apply_save_data(env, *_parse_save_data(data))
+
+def read(filename):
+    if os.path.exists(filename + '.sav'):
+        filename += '.sav'
+    with open(filename, 'rb') as f:
+        return _parse_save_data(f.read())
+
+def write(env, filename):
+    if not filename.endswith('.sav'):
+        filename += '.sav'
+    try:
+        with open(filename, 'wb') as f:
+            f.write(dump_bytes(env))
+        return True
+    except IOError as ioerr:
+        env.screen.msg('error writing save file: '+str(ioerr)+'\n')
+        return False
+
+def load_to_env(env, filename):
+    try:
+        if os.path.exists(filename + '.sav'):
+            filename += '.sav'
+        with open(filename, 'rb') as f:
+            return load_bytes_to_env(env, f.read())
+    except IOError as ioerr:
+        env.screen.msg('error reading file: '+str(ioerr)+'\n')
+        return False
