@@ -1053,7 +1053,22 @@ def set_cursor(env, opinfo):
     env.screen.finish_wrapping()
 
     row = to_signed_word(opinfo.operands[0])
-    col = to_signed_word(opinfo.operands[1])
+
+    # In V6, a one-operand set_cursor -1/-2 hides/shows the cursor. Xyppy has
+    # no cursor-visibility state to update, but the instruction is still valid
+    # and must not be treated as a two-coordinate cursor move.
+    if len(opinfo.operands) == 1 and row in (-1, -2):
+        return
+
+    if len(opinfo.operands) > 1:
+        col = to_signed_word(opinfo.operands[1])
+    elif len(env.previous_operands) > 1:
+        # Old Inform output can contain a malformed one-operand set_cursor and
+        # accidentally depend on the reusable operand array used by classic
+        # interpreters. Anchorhead's ABOUT menu is one such case.
+        col = to_signed_word(env.previous_operands[1])
+    else:
+        col = 1
     if row < 1: # why do we not error out here?
         row = 1
     if col < 1: # same question

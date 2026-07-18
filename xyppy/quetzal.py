@@ -20,14 +20,16 @@ class IFhdChunk(Chunk):
         obj.pc = struct.unpack('>I', pc_bytes)[0]
         return obj
     @classmethod
-    def from_env(cls, env):
+    def from_env(cls, env, pc=None):
         obj = cls()
         obj.name = b'IFhd'
         obj.size = 13
         obj.release = env.hdr.release
         obj.serial = bytes(bytearray(env.hdr.serial))
         obj.checksum = env.hdr.checksum
-        if env.hdr.version < 4:
+        if pc is not None:
+            obj.pc = pc
+        elif env.hdr.version < 4:
             obj.pc = env.last_pc_branch_var
         else:
             obj.pc = env.last_pc_store_var
@@ -246,15 +248,27 @@ def _apply_save_data(env, subname, hdrChunk, memChunk, frames):
         return True
     return False
 
-def dump_bytes(env):
-    chunks = [IFhdChunk.from_env(env),
+def _dump_bytes(env, pc=None):
+    chunks = [IFhdChunk.from_env(env, pc=pc),
               CMemChunk.from_env(env),
               StksChunk.from_env(env)]
     formChunk = FormChunk.from_chunk_list(b'IFZS', chunks)
     return formChunk.pack()
 
+def dump_bytes(env):
+    """Serialize a save made by a Z-machine save instruction."""
+    return _dump_bytes(env)
+
+def dump_snapshot_bytes(env):
+    """Serialize an interpreter snapshot that resumes at the current PC."""
+    return _dump_bytes(env, pc=env.pc)
+
 def load_bytes_to_env(env, data):
     return _apply_save_data(env, *_parse_save_data(data))
+
+def load_snapshot_bytes_to_env(env, data):
+    """Load a snapshot without applying save-instruction continuation rules."""
+    return load_bytes_to_env(env, data)
 
 def read(filename):
     if os.path.exists(filename + '.sav'):

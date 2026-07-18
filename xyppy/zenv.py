@@ -155,6 +155,12 @@ class Env:
         self.icache = {}
         self.fncache = {}
 
+        # Most Z-machine interpreters decode operands into a reusable array.
+        # Keep the previous instruction's operands for compatibility with old
+        # story files which accidentally rely on omitted entries retaining
+        # their earlier values (notably Anchorhead's ABOUT menu).
+        self.previous_operands = []
+
         self.fg_color = self.hdr.default_fg_color
         self.bg_color = self.hdr.default_bg_color
 
@@ -251,6 +257,10 @@ def step(env):
             warn(    'stored_result', dbg_decode_result(env, op.__name__, opinfo.store_var))
     else:
         op(env, opinfo)
+
+    # Copy this: cached OpInfo operands containing variables are updated each
+    # time the instruction runs.
+    env.previous_operands = opinfo.operands[:]
 
 def dbg_decode_branch(env, offset):
     if offset == 0 or offset == 1:
